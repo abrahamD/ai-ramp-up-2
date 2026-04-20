@@ -48,6 +48,17 @@ export default function Home() {
 
       const data = await response.json();
 
+      if (!response.ok) {
+        setMessages([
+          ...newMessages,
+          {
+            role: 'assistant',
+            content: `Error: ${data.error ?? 'Something went wrong. Check the server logs for details.'}`,
+          },
+        ]);
+        return;
+      }
+
       setMessages([
         ...newMessages,
         {
@@ -59,7 +70,7 @@ export default function Home() {
     } catch {
       setMessages([
         ...newMessages,
-        { role: 'assistant', content: 'An error occurred. Please try again.' },
+        { role: 'assistant', content: 'Network error. Please try again.' },
       ]);
     } finally {
       setIsLoading(false);

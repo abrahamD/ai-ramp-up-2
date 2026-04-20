@@ -9,7 +9,7 @@ export interface RetrievedChunk {
   similarity: number;
 }
 
-const MATCH_THRESHOLD = parseFloat(process.env.RAG_SIMILARITY_THRESHOLD ?? '0.7');
+const MATCH_THRESHOLD = parseFloat(process.env.RAG_SIMILARITY_THRESHOLD ?? '0.5');
 
 export async function retrieveChunks(
   query: string,
@@ -24,8 +24,7 @@ export async function retrieveChunks(
   });
 
   if (error) {
-    console.error('Retrieval error:', error);
-    return [];
+    throw new Error(`Supabase retrieval failed: ${error.message}`);
   }
 
   return (data ?? []) as RetrievedChunk[];

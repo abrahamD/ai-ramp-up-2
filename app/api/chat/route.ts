@@ -34,12 +34,16 @@ export async function POST(req: NextRequest) {
     chunks = await retrieveChunks(lastUserMessage);
   } catch (err) {
     console.error('Retrieval failed:', err);
+    return NextResponse.json(
+      { error: String(err) },
+      { status: 500 }
+    );
   }
 
   if (chunks.length === 0) {
     return NextResponse.json({
       content:
-        'Please upload a document first so I can answer questions about it.',
+        "I couldn't find relevant information in the document for that question. Try rephrasing, or upload a document if you haven't already.",
       retrievedChunks: [],
     });
   }
