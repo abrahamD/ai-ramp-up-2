@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, KeyboardEvent } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import UploadZone from '@/components/UploadZone';
 import DocumentStatus from '@/components/DocumentStatus';
 import SourceCitations from '@/components/SourceCitations';
@@ -12,13 +14,26 @@ interface Message {
   retrievedChunks?: RetrievedChunk[];
 }
 
+interface ExistingDocument {
+  source: string;
+  chunkCount: number;
+}
+
 export default function Home() {
   const [documentSource, setDocumentSource] = useState<string | null>(null);
   const [chunkCount, setChunkCount] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [existingDocs, setExistingDocs] = useState<ExistingDocument[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch('/api/documents')
+      .then((r) => r.json())
+      .then((data) => setExistingDocs(data.documents ?? []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -92,6 +107,42 @@ export default function Home() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Document Chat</h1>
             <p className="text-gray-500">Upload a PDF to start asking questions about it</p>
           </div>
+
+          {existingDocs.length > 0 && (
+            <div className="mb-4 bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+              <h2 className="text-sm font-semibold text-gray-600 mb-3">Continue with an existing document</h2>
+              <ul className="space-y-2">
+                {existingDocs.map((doc) => (
+                  <li key={doc.source}>
+                    <button
+                      onClick={() => {
+                        setDocumentSource(doc.source);
+                        setChunkCount(doc.chunkCount);
+                        setMessages([]);
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl
+                        border border-gray-200 hover:border-blue-400 hover:bg-blue-50
+                        transition-colors text-left group"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <svg className="w-4 h-4 text-red-400 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-sm font-medium text-gray-700 truncate">{doc.source}</span>
+                      </div>
+                      <span className="text-xs text-gray-400 shrink-0 ml-2 group-hover:text-blue-500">
+                        {doc.chunkCount} chunks
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-4 border-t border-gray-100 pt-4">
+                <p className="text-xs text-gray-400 text-center">— or upload a new document —</p>
+              </div>
+            </div>
+          )}
+
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <UploadZone onSuccess={handleUploadSuccess} />
           </div>
@@ -133,7 +184,29 @@ export default function Home() {
                         : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm'
                     }`}
                   >
-                    {message.content}
+                    {message.role === 'assistant' ? (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          h1: ({ children }) => <h1 className="text-base font-bold mt-3 mb-1 first:mt-0">{children}</h1>,
+                          h2: ({ children }) => <h2 className="text-sm font-bold mt-3 mb-1 first:mt-0">{children}</h2>,
+                          h3: ({ children }) => <h3 className="text-sm font-semibold mt-2 mb-1 first:mt-0">{children}</h3>,
+                          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                          ul: ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-0.5">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-0.5">{children}</ol>,
+                          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                          em: ({ children }) => <em className="italic">{children}</em>,
+                          blockquote: ({ children }) => <blockquote className="border-l-2 border-gray-300 pl-3 text-gray-500 italic my-2">{children}</blockquote>,
+                          code: ({ children }) => <code className="bg-gray-100 text-gray-800 rounded px-1 py-0.5 font-mono text-xs">{children}</code>,
+                          hr: () => <hr className="my-3 border-gray-200" />,
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    ) : (
+                      message.content
+                    )}
                   </div>
                   {message.role === 'assistant' && message.retrievedChunks && (
                     <SourceCitations chunks={message.retrievedChunks} />
